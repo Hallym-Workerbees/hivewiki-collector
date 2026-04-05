@@ -8,6 +8,7 @@ dependencies = [
   "beautifulsoup4>=4.14.3",
   "feedparser>=6.0.12",
   "psycopg[binary]>=3.3.3",
+  "redis>=7.4.0",
   "requests>=2.33.0",
 ]
 

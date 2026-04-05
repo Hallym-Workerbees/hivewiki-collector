@@ -13,8 +13,16 @@ DATABASE_DSN = os.getenv(
     f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
 )
 
-WIKIFIER_URL = os.getenv("WIKIFIER_URL", "http://wikifier:8000/ingest")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_QUEUE_NAME = os.getenv("REDIS_QUEUE_NAME", "wikify_queue")
+
 LOOP_SLEEP_SECONDS = int(os.getenv("LOOP_SLEEP_SECONDS", "5"))
-DUE_SOURCE_BATCH_SIZE = int(os.getenv("DUE_SOURCE_BATCH_SIZE", "10"))
+POLL_INTERVAL_MINUTES = int(os.getenv("POLL_INTERVAL_MINUTES", "10"))
+SOURCE_BATCH_SIZE = int(os.getenv("SOURCE_BATCH_SIZE", "50"))
+RSS_FETCH_LIMIT = int(os.getenv("RSS_FETCH_LIMIT", "10"))
+MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "3"))
+
 HTTP_TIMEOUT_SECONDS = int(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 USER_AGENT = os.getenv("USER_AGENT", "HiveWiki-Collector/0.1")

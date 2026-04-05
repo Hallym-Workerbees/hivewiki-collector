@@ -1,35 +1,33 @@
 from __future__ import annotations
 
-import requests
+import json
 
-from app.config import HTTP_TIMEOUT_SECONDS, USER_AGENT, WIKIFIER_URL
+from redis import Redis
+
+from app.config import REDIS_DB, REDIS_HOST, REDIS_PORT, REDIS_QUEUE_NAME
 from app.models import CollectedDocument, Source
 
 
-def publish(source: Source, doc: CollectedDocument) -> None:
+def get_redis_client() -> Redis:
+    return Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+
+
+def enqueue_document(
+    redis_client: Redis, source: Source, doc: CollectedDocument
+) -> None:
     payload = {
         "source": {
             "id": source.id,
             "name": source.name,
-            "type": source.source_type,
-            "category_path": source.category_path,
-            "ocr_enabled": source.ocr_enabled,
         },
         "document": {
+            "source_id": doc.source_id,
             "external_id": doc.external_id,
             "canonical_url": doc.canonical_url,
             "title": doc.title,
             "body_text": doc.body_text,
             "published_at": doc.published_at.isoformat() if doc.published_at else None,
-            "content_hash": doc.content_hash,
-            "image_urls": doc.image_urls,
         },
     }
 
-    resp = requests.post(
-        WIKIFIER_URL,
-        json=payload,
-        timeout=HTTP_TIMEOUT_SECONDS,
-        headers={"User-Agent": USER_AGENT},
-    )
-    resp.raise_for_status()
+    redis_client.rpush(REDIS_QUEUE_NAME, json.dumps(payload, ensure_ascii=False))
