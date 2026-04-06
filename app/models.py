@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -6,17 +8,9 @@ from datetime import datetime
 class Source:
     id: int
     name: str
-    source_type: str
-    parser_type: str | None
     target_url: str
-    category_path: str | None
     enabled: bool
-    poll_interval_minutes: int
-    latest_fetch_limit: int
-    rate_limit_seconds: int
-    update_policy: str
-    ocr_enabled: bool
-    next_run_at: datetime | None
+    initial_backfill_done: bool
 
 
 @dataclass
@@ -27,5 +21,3 @@ class CollectedDocument:
     title: str
     body_text: str
     published_at: datetime | None
-    content_hash: str | None
-    image_urls: list[str]
