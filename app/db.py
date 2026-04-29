@@ -5,6 +5,10 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from app.config import (
+    SOURCE_FAILURE_MAX_BACKOFF_MINUTES,
+    SOURCE_FAILURE_RETRY_MINUTES,
+)
 from app.models import CollectedDocument, IngestionJob, Source
 
 
@@ -98,10 +102,22 @@ def mark_source_failure(conn, source_id: int, error: str) -> None:
             SET last_error_at = NOW(),
                 last_error_message = %s,
                 consecutive_failures = consecutive_failures + 1,
+                next_poll_at = NOW() + (
+                    LEAST(
+                        GREATEST(%s, POWER(2, LEAST(consecutive_failures, 10))::integer),
+                        %s,
+                        poll_interval_minutes
+                    ) * INTERVAL '1 minute'
+                ),
                 updated_at = NOW()
             WHERE id = %s
             """,
-            (error[:1000], source_id),
+            (
+                error[:1000],
+                SOURCE_FAILURE_RETRY_MINUTES,
+                SOURCE_FAILURE_MAX_BACKOFF_MINUTES,
+                source_id,
+            ),
         )
     conn.commit()
 
@@ -172,7 +188,7 @@ def _insert_source_document(cur, doc: CollectedDocument) -> dict[str, Any] | Non
             doc.title,
             doc.published_at,
             doc.body_text or None,
-            "COMPLETED" if doc.body_text else "PENDING",
+            "DONE" if doc.body_text else "PENDING",
         ),
     )
     return cur.fetchone()
