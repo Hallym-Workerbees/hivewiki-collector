@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import feedparser
+import requests
 
+from app.config import HTTP_TIMEOUT_SECONDS, USER_AGENT
 from app.models import CollectedDocument, Source
 from app.utils import html_to_text, parse_datetime
 
@@ -29,7 +31,14 @@ def _entry_to_document(source: Source, entry) -> CollectedDocument | None:
 
 
 def collect_latest(source: Source, limit: int) -> list[CollectedDocument]:
-    feed = feedparser.parse(source.target_url)
+    response = requests.get(
+        source.target_url,
+        headers={"User-Agent": USER_AGENT},
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+
+    feed = feedparser.parse(response.content)
     docs: list[CollectedDocument] = []
 
     for entry in list(feed.entries)[:limit]:

@@ -56,3 +56,6 @@ ON ingestion_jobs (status, queued_at);
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_source_document
 ON ingestion_jobs (source_document_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ingestion_jobs_source_document
+ON ingestion_jobs (source_document_id);
