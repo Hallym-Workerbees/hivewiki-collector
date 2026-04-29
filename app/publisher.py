@@ -5,7 +5,7 @@ import json
 from redis import Redis
 
 from app.config import REDIS_DB, REDIS_HOST, REDIS_PORT, REDIS_QUEUE_NAME
-from app.models import CollectedDocument, Source
+from app.models import CollectedDocument, IngestionJob, Source
 
 
 def get_redis_client() -> Redis:
@@ -13,16 +13,25 @@ def get_redis_client() -> Redis:
 
 
 def enqueue_document(
-    redis_client: Redis, source: Source, doc: CollectedDocument
+    redis_client: Redis,
+    source: Source,
+    doc: CollectedDocument,
+    job: IngestionJob,
 ) -> None:
     payload = {
+        "job": {
+            "id": job.id,
+            "source_document_id": job.source_document_id,
+            "status": job.status,
+            "retry_count": job.retry_count,
+            "queued_at": job.queued_at.isoformat(),
+        },
         "source": {
             "id": source.id,
             "name": source.name,
         },
         "document": {
             "source_id": doc.source_id,
-            "external_id": doc.external_id,
             "canonical_url": doc.canonical_url,
             "title": doc.title,
             "body_text": doc.body_text,
