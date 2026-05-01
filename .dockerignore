@@ -29,9 +29,6 @@ schema.sql
 *.log
 *.db
 *.db-journal
-*.sqlite
-*.sqlite3
-db.sqlite3
 htmlcov
 coverage.xml
 .coverage
