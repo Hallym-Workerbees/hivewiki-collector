@@ -7,6 +7,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-image:
     uses: Hallym-Workerbees/hivewiki-ci/.github/workflows/build-scan-push-image.yml@main
