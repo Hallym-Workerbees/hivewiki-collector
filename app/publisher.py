@@ -6,11 +6,7 @@ from redis import Redis
 from redis.exceptions import RedisError
 
 from app.config import (
-    REDIS_DB,
     REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
-    REDIS_HOST,
-    REDIS_PASSWORD,
-    REDIS_PORT,
     REDIS_QUEUE_NAME,
     REDIS_SOCKET_TIMEOUT_SECONDS,
     REDIS_URL,
@@ -26,16 +22,7 @@ def get_redis_client() -> Redis:
         "health_check_interval": REDIS_HEALTH_CHECK_INTERVAL_SECONDS,
     }
 
-    if REDIS_URL:
-        return Redis.from_url(REDIS_URL, **common_kwargs)
-
-    return Redis(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        db=REDIS_DB,
-        password=REDIS_PASSWORD,
-        **common_kwargs,
-    )
+    return Redis.from_url(REDIS_URL, **common_kwargs)
 
 
 def enqueue_document(

@@ -14,11 +14,7 @@ DATABASE_DSN = os.getenv(
 )
 DB_RECONNECT_SLEEP_SECONDS = int(os.getenv("DB_RECONNECT_SLEEP_SECONDS", "5"))
 
-REDIS_URL = os.getenv("REDIS_URL")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 REDIS_QUEUE_NAME = os.getenv("REDIS_QUEUE_NAME", "wikify_queue")
 REDIS_SOCKET_TIMEOUT_SECONDS = int(os.getenv("REDIS_SOCKET_TIMEOUT_SECONDS", "5"))
 REDIS_HEALTH_CHECK_INTERVAL_SECONDS = int(
