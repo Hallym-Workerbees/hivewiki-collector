@@ -33,3 +33,6 @@ MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "3"))
 
 HTTP_TIMEOUT_SECONDS = int(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 USER_AGENT = os.getenv("USER_AGENT", "HiveWiki-Collector/0.1")
+
+PROBE_HOST = os.getenv("PROBE_HOST", "0.0.0.0")
+PROBE_PORT = int(os.getenv("PROBE_PORT", "8080"))

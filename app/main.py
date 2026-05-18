@@ -14,6 +14,8 @@ from app.config import (
     JOB_PUBLISH_CLAIM_TIMEOUT_SECONDS,
     LOOP_SLEEP_SECONDS,
     MAX_RETRY_COUNT,
+    PROBE_HOST,
+    PROBE_PORT,
     QUEUE_BATCH_SIZE,
     SOURCE_BATCH_SIZE,
 )
@@ -32,6 +34,7 @@ from app.db import (
     save_new_documents,
 )
 from app.models import Source
+from app.probe import start_probe_server
 from app.publisher import enqueue_document_with_retry, get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -158,6 +161,7 @@ def close_dead_jobs(conn) -> None:
 
 def run() -> None:
     configure_logging()
+    start_probe_server(PROBE_HOST, PROBE_PORT)
     conn = open_db_connection()
     redis_client = get_redis_client()
     logger.info("collector started")
