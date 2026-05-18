@@ -9,7 +9,8 @@ from app.collectors import collect_backfill_documents, collect_documents
 from app.config import (
     DATABASE_DSN,
     DB_RECONNECT_SLEEP_SECONDS,
-    INCREMENTAL_FETCH_LIMIT,
+    INCREMENTAL_MAX_SCAN_LIMIT,
+    INCREMENTAL_SCAN_LIMIT,
     INITIAL_BACKFILL_LIMIT,
     JOB_PUBLISH_CLAIM_TIMEOUT_SECONDS,
     LOOP_SLEEP_SECONDS,
@@ -46,14 +47,51 @@ def configure_logging() -> None:
 
 def process_source(conn, source: Source) -> None:
     is_backfill = not source.initial_backfill_done
-    fetch_limit = INITIAL_BACKFILL_LIMIT if is_backfill else INCREMENTAL_FETCH_LIMIT
+    fetch_limit = INITIAL_BACKFILL_LIMIT if is_backfill else INCREMENTAL_SCAN_LIMIT
 
     if is_backfill:
         docs = collect_backfill_documents(source, limit=fetch_limit)
+        inserted_count, queued_job_count = save_new_documents(conn, docs)
     else:
-        docs = collect_documents(source, limit=fetch_limit)
+        docs = []
+        inserted_count = 0
+        queued_job_count = 0
+        seen_urls = set()
+        scan_limit = INCREMENTAL_SCAN_LIMIT
+        keep_scanning = True
 
-    inserted_count, queued_job_count = save_new_documents(conn, docs)
+        while keep_scanning:
+            available_docs = [
+                doc
+                for doc in collect_documents(source, limit=scan_limit)
+                if doc.canonical_url not in seen_urls
+            ]
+
+            for doc in available_docs:
+                doc_inserted_count, doc_queued_job_count = save_new_documents(
+                    conn,
+                    [doc],
+                )
+                docs.append(doc)
+                seen_urls.add(doc.canonical_url)
+                inserted_count += doc_inserted_count
+                queued_job_count += doc_queued_job_count
+
+                if doc_inserted_count == 0:
+                    keep_scanning = False
+                    break
+
+            if len(available_docs) < scan_limit or not keep_scanning:
+                break
+
+            if scan_limit >= INCREMENTAL_MAX_SCAN_LIMIT:
+                break
+
+            if keep_scanning and len(seen_urls) >= scan_limit:
+                scan_limit = min(scan_limit * 2, INCREMENTAL_MAX_SCAN_LIMIT)
+            else:
+                break
+
     mark_source_success(conn, source.id, backfill_done=is_backfill)
 
     logger.info(
