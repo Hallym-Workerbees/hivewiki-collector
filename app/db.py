@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
 
 from app.models import CollectedDocument, IngestionJob, Source
+
+logger = logging.getLogger(__name__)
 
 
 def connect(dsn: str):
@@ -127,19 +130,62 @@ def create_ingestion_job(conn, source_document_id: int) -> int | None:
 def save_new_documents(conn, docs: list[CollectedDocument]) -> tuple[int, int]:
     inserted_documents = 0
     queued_jobs = 0
+    duplicate_documents = 0
+    source_id = docs[0].source_id if docs else None
+
+    if not docs:
+        logger.info("source documents save skipped attempted=0")
+        return inserted_documents, queued_jobs
 
     with conn.cursor() as cur:
         for doc in docs:
             row = _insert_source_document(cur, doc)
             if row is None:
+                duplicate_documents += 1
+                logger.debug(
+                    "source document already exists source_id=%s canonical_url=%s title=%s",
+                    doc.source_id,
+                    doc.canonical_url,
+                    doc.title,
+                )
                 continue
 
             inserted_documents += 1
+            logger.debug(
+                "source document inserted source_id=%s source_document_id=%s canonical_url=%s title=%s fetch_status=%s",
+                doc.source_id,
+                row["id"],
+                doc.canonical_url,
+                doc.title,
+                "DONE" if doc.body_text else "PENDING",
+            )
             job_row = _create_ingestion_job(cur, row["id"])
             if job_row is not None:
                 queued_jobs += 1
+                logger.debug(
+                    "ingestion job created source_id=%s source_document_id=%s job_id=%s",
+                    doc.source_id,
+                    row["id"],
+                    job_row["id"],
+                )
+            else:
+                logger.warning(
+                    "ingestion job was not created source_id=%s source_document_id=%s canonical_url=%s",
+                    doc.source_id,
+                    row["id"],
+                    doc.canonical_url,
+                )
 
     conn.commit()
+
+    logger.info(
+        "source documents saved source_id=%s attempted=%s inserted=%s duplicates=%s queued_jobs=%s",
+        source_id,
+        len(docs),
+        inserted_documents,
+        duplicate_documents,
+        queued_jobs,
+    )
 
     return inserted_documents, queued_jobs
 
