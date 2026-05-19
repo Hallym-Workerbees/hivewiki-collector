@@ -11,6 +11,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Apply latest Debian security patches to reduce OS package CVEs
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 app \
   && useradd --system --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app
 
