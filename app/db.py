@@ -154,6 +154,7 @@ def _insert_source_document(cur, doc: CollectedDocument) -> dict[str, Any] | Non
             published_at,
             body_text,
             fetch_status,
+            fetch_retry_count,
             wiki_status,
             collected_at
         )
@@ -164,6 +165,7 @@ def _insert_source_document(cur, doc: CollectedDocument) -> dict[str, Any] | Non
             %s,
             %s,
             %s,
+            0,
             'NOT_REQUESTED',
             NOW()
         )
