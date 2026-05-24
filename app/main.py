@@ -4,7 +4,9 @@ import logging
 import time
 
 import psycopg
+from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError
 
+from app import metrics
 from app.collectors import collect_backfill_documents, collect_documents
 from app.config import (
     DATABASE_DSN,
@@ -27,6 +29,8 @@ from app.db import (
     claim_due_sources,
     claim_jobs_ready_to_publish,
     connect,
+    get_document_metric_counts,
+    get_source_metric_rows,
     mark_job_publish_failed,
     mark_job_published,
     mark_jobs_dead,
@@ -39,6 +43,14 @@ from app.probe import start_probe_server
 from app.publisher import enqueue_document_with_retry, get_redis_client
 
 logger = logging.getLogger(__name__)
+
+
+def classify_dispatch_error(exc: Exception) -> str:
+    if isinstance(exc, RedisTimeoutError):
+        return metrics.REASON_TIMEOUT
+    if isinstance(exc, RedisError):
+        return metrics.REASON_DISPATCH_ERROR
+    return metrics.REASON_UNKNOWN
 
 
 def configure_logging() -> None:
@@ -72,6 +84,11 @@ def process_source(conn, source: Source) -> None:
             fetch_limit,
         )
         inserted_count, queued_job_count = save_new_documents(conn, docs)
+        metrics.record_document_results(
+            source,
+            new_count=inserted_count,
+            unchanged_count=len(docs) - inserted_count,
+        )
     else:
         docs = []
         inserted_count = 0
@@ -111,6 +128,11 @@ def process_source(conn, source: Source) -> None:
                 seen_urls.add(doc.canonical_url)
                 inserted_count += doc_inserted_count
                 queued_job_count += doc_queued_job_count
+                metrics.record_document_results(
+                    source,
+                    new_count=doc_inserted_count,
+                    unchanged_count=1 - doc_inserted_count,
+                )
 
                 if doc_inserted_count == 0:
                     logger.info(
@@ -159,6 +181,7 @@ def process_source(conn, source: Source) -> None:
                 break
 
     mark_source_success(conn, source.id, backfill_done=is_backfill)
+    metrics.record_source_success(source)
 
     logger.info(
         "source processed source_id=%s name=%s backfill=%s fetched=%s inserted=%s queued_jobs=%s next_interval_minutes=%s",
@@ -174,6 +197,7 @@ def process_source(conn, source: Source) -> None:
 
 def safe_mark_source_failure(conn, source: Source, error: str) -> None:
     mark_source_failure(conn, source.id, error)
+    metrics.record_source_failure(source)
     logger.exception(
         "source processing failed source_id=%s name=%s target_url=%s error=%s",
         source.id,
@@ -204,6 +228,7 @@ def publish_ingestion_jobs(conn, redis_client):
         document = build_document_from_job_row(row)
         job = build_job_from_row(row)
 
+        dispatch_started_at = time.monotonic()
         try:
             logger.info(
                 "job publish started job_id=%s source_document_id=%s source_id=%s source_name=%s canonical_url=%s retry_count=%s",
@@ -221,6 +246,17 @@ def publish_ingestion_jobs(conn, redis_client):
                 job,
             )
         except Exception as exc:
+            metrics.record_dispatch(
+                source,
+                metrics.DISPATCH_TARGET_WIKIFIER,
+                "failure",
+                time.monotonic() - dispatch_started_at,
+            )
+            metrics.record_dispatch_failure(
+                source,
+                metrics.DISPATCH_TARGET_WIKIFIER,
+                classify_dispatch_error(exc),
+            )
             mark_job_publish_failed(conn, job.id, job.source_document_id, str(exc))
             logger.exception(
                 "job publish failed job_id=%s source_document_id=%s source_id=%s canonical_url=%s error=%s",
@@ -234,6 +270,12 @@ def publish_ingestion_jobs(conn, redis_client):
             continue
 
         mark_job_published(conn, job.id, job.source_document_id)
+        metrics.record_dispatch(
+            source,
+            metrics.DISPATCH_TARGET_WIKIFIER,
+            "success",
+            time.monotonic() - dispatch_started_at,
+        )
         published_count += 1
         logger.info(
             "job published job_id=%s source_document_id=%s source_id=%s source_name=%s canonical_url=%s",
@@ -295,6 +337,11 @@ def close_dead_jobs(conn) -> None:
         logger.warning("job moved to DEAD job_id=%s", job_id)
 
 
+def refresh_collector_gauges(conn) -> None:
+    metrics.update_source_gauges(get_source_metric_rows(conn))
+    metrics.update_document_gauges(get_document_metric_counts(conn))
+
+
 def run() -> None:
     configure_logging()
     start_probe_server(PROBE_HOST, PROBE_PORT)
@@ -303,6 +350,7 @@ def run() -> None:
     logger.info("collector started")
 
     while True:
+        loop_started_at = time.monotonic()
         try:
             due_sources = claim_due_sources(conn, limit=SOURCE_BATCH_SIZE)
 
@@ -323,11 +371,16 @@ def run() -> None:
 
             redis_client = publish_ingestion_jobs(conn, redis_client)
             close_dead_jobs(conn)
+            refresh_collector_gauges(conn)
         except psycopg.Error:
+            metrics.loop_errors_total.inc()
             logger.exception("database operation failed; reconnecting")
             conn = reconnect_db(conn)
         except Exception:
+            metrics.loop_errors_total.inc()
             logger.exception("collector loop failed unexpectedly")
+        finally:
+            metrics.loop_duration_seconds.observe(time.monotonic() - loop_started_at)
 
         time.sleep(LOOP_SLEEP_SECONDS)
 

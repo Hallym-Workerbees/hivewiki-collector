@@ -24,6 +24,7 @@ def _row_to_source(row: dict[str, Any]) -> Source:
         poll_interval_minutes=row["poll_interval_minutes"],
         next_poll_at=row["next_poll_at"],
         initial_backfill_done=row["initial_backfill_done"],
+        consecutive_failures=row["consecutive_failures"],
     )
 
 
@@ -417,6 +418,52 @@ def mark_jobs_dead(conn, max_retry_count: int, limit: int = 100) -> list[int]:
     return dead_job_ids
 
 
+def get_source_metric_rows(conn) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                id,
+                enabled,
+                next_poll_at,
+                consecutive_failures,
+                last_success_at,
+                last_error_at,
+                enabled = TRUE AND next_poll_at <= NOW() AS active
+            FROM sources
+            ORDER BY id ASC
+            """
+        )
+        return cur.fetchall()
+
+
+def get_document_metric_counts(conn) -> dict[str, int]:
+    counts = {"pending": 0, "failed": 0, "dead": 0}
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE wiki_status IN ('NOT_REQUESTED', 'QUEUED')
+                ) AS pending,
+                COUNT(*) FILTER (WHERE wiki_status = 'FAILED') AS failed,
+                COUNT(*) FILTER (WHERE wiki_status = 'DEAD') AS dead
+            FROM source_documents
+            """
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        return counts
+
+    return {
+        "pending": row["pending"] or 0,
+        "failed": row["failed"] or 0,
+        "dead": row["dead"] or 0,
+    }
+
+
 def build_source_from_job_row(row: dict[str, Any]) -> Source:
     return Source(
         id=row["source_id"],
@@ -426,6 +473,7 @@ def build_source_from_job_row(row: dict[str, Any]) -> Source:
         poll_interval_minutes=0,
         next_poll_at=None,
         initial_backfill_done=True,
+        consecutive_failures=0,
     )
 
 
