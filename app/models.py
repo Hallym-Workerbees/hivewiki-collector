@@ -13,6 +13,7 @@ class Source:
     poll_interval_minutes: int
     next_poll_at: datetime | None
     initial_backfill_done: bool
+    consecutive_failures: int = 0
 
 
 @dataclass
