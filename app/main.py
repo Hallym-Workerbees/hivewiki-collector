@@ -4,7 +4,8 @@ import logging
 import time
 
 import psycopg
-from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError
+from redis.exceptions import RedisError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app import metrics
 from app.collectors import collect_backfill_documents, collect_documents

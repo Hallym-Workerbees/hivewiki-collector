@@ -163,7 +163,9 @@ def now() -> float:
     return time.time()
 
 
-def record_fetch(source: Source | int | str, status: str, duration_seconds: float) -> None:
+def record_fetch(
+    source: Source | int | str, status: str, duration_seconds: float
+) -> None:
     label = source_label(source)
     rss_fetch_total.labels(source=label, status=status).inc()
     rss_fetch_duration_seconds.labels(source=label).observe(duration_seconds)
@@ -202,7 +204,9 @@ def record_dispatch(
 ) -> None:
     label = source_label(source)
     dispatch_total.labels(source=label, target=target, status=status).inc()
-    dispatch_duration_seconds.labels(source=label, target=target).observe(duration_seconds)
+    dispatch_duration_seconds.labels(source=label, target=target).observe(
+        duration_seconds
+    )
 
 
 def record_dispatch_failure(
