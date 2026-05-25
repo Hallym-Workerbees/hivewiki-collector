@@ -36,10 +36,17 @@ def _entry_to_document(
     return CollectedDocument(
         source_id=source.id,
         canonical_url=canonical_url,
-        title=entry.get("title", "").strip(),
+        title=_clean_title(entry.get("title", "")),
         body_text=body_text,
         published_at=parse_datetime(entry.get("published")),
     )
+
+
+def _clean_title(value: str | None) -> str:
+    title = (value or "").strip()
+    if title.endswith("}"):
+        title = title[:-1].rstrip()
+    return title
 
 
 def _with_limit_query_param(url: str, limit: int) -> str:
