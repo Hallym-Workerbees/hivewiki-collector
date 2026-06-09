@@ -1,5 +1,7 @@
 # HiveWiki Collector
 
+🏆 2026학년도 1학기 한림대학교 SW캡스톤디자인 경진대회 금상 수상 프로젝트
+
 HiveWiki Collector는 HiveWiki 파이프라인의 수집 단계입니다.
 
 현재 collector는 RSS source를 주기적으로 polling하고, 새 문서를 데이터베이스에 저장한 뒤 downstream wikifier가 처리할 수 있도록 Redis queue로 dispatch합니다. 수집 대상의 원문 URL, 제목, 본문 요약, 발행 시각을 보존하고, source별 polling 상태와 dispatch 상태를 추적합니다.
